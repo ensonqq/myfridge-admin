@@ -566,7 +566,7 @@ export default {
     },
 
     newProduct () {
-      this.productImg = "//placehold.co/700x800"
+      this.productImg = "//placehold.co/400x400"
       this.product = {
         ingredients   : {
           zh : '',
@@ -626,7 +626,7 @@ export default {
       const loading = new Loading.service({ fullscreen : false });
       try {
         const detail = await this.$api.get('/v1/products/' + productId)
-        this.productImg = detail.data.images[0] ? detail.data.images[0].large.path : '//placehold.co/700x800'
+        this.productImg = detail.data.images[0] ? detail.data.images[0].large.path : '//placehold.co/400x400'
         this.product = detail.data
         if (this.product.images.length) {
           this.product.images = detail.data.images.filter(item => item && item.id).map(item => item.id)
