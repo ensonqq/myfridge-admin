@@ -3,11 +3,11 @@ import Cookies from 'js-cookie'
 import store   from '../store'
 // initial base url by host name
 const hostname = window.location.hostname
-// const localApiRoot = 'https://api.myfridgehk.com'
+// const localApiRoot = 'http://api.myfridgehk.com'
 const localApiRoot = 'http://localhost:3001'
-// const localApiRoot = 'https://dev.myfridgehk.com/api'
-const devApiRoot = 'https://api-dev.myfridgehk.com'
-const prodApiRoot = 'https://api.myfridgehk.com'
+// const localApiRoot = 'http://dev.myfridgehk.com/api'
+const devApiRoot = 'http://api-dev.myfridgehk.com'
+const prodApiRoot = 'http://api.myfridgehk.com'
 
 const baseURL = hostname === 'm9sj7sd1.myfridgehk.com' ? prodApiRoot : hostname === 'admin-dev.myfridgehk.com' ? devApiRoot : localApiRoot
 
