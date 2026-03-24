@@ -40,6 +40,29 @@
 
                 <div class="row">
                   <div class="mb-2 col-6">
+                    <ValidationProvider name="name">
+                      <fg-input label="大分類">
+                        <el-select placeholder="輸入搜尋"
+                                   class="select-normal w-100"
+                                   v-model="category.categoryGroup"
+                                   @clear="category.categoryGroup=null"
+                                   allow-create
+                                   clearable>
+                          <el-option v-for="group in categoryGroups"
+                                     :key="group.id"
+                                     :label="group.name.zh"
+                                     :value="group.id">
+                          </el-option>
+                        </el-select>
+                      </fg-input>
+                    </ValidationProvider>
+                  </div>
+                  <div class="mb-2 col-6">
+                    <el-button class="mt-4" @click="createdCategoryGroup">＋建立大分類</el-button>
+                  </div>
+                </div>
+                <div class="row">
+                  <div class="mb-2 col-6">
                     <ValidationProvider name="zhname" rules="required" v-slot="{ passed, failed }">
                       <fg-input type="text"
                                 label="類別名稱(中文)"
@@ -219,6 +242,7 @@
       <el-button @click="close">關閉</el-button>
       <el-button type="primary" @click="submit">确定</el-button>
     </span>
+    <AddCategoryGroupModal ref="AddCategoryGroupModal"></AddCategoryGroupModal>
   </el-dialog>
 </template>
 <script>
@@ -232,6 +256,8 @@ import Vue                                                                   fro
 import UserProfile
                                                                              from "@/components/Dashboard/Views/Pages/UserProfile";
 import draggable                                                             from 'vuedraggable'
+import AddCategoryGroupModal
+                                                                             from "@/components/Dashboard/Views/Shop/components/AddCategoryGroupModal";
 
 extend("required", required);
 extend("numeric", numeric);
@@ -241,6 +267,7 @@ extend("confirmed", confirmed);
 export default {
   components : {
     Card,
+    AddCategoryGroupModal,
     [Option.name]     : Option,
     [Select.name]     : Select,
     [Button.name]     : Button,
@@ -253,15 +280,17 @@ export default {
   },
   data () {
     return {
-      dialogVisible : false,
-      resolve       : null,
-      reject        : null,
+      categoryGroups : [],
+      dialogVisible  : false,
+      resolve        : null,
+      reject         : null,
       moment,
-      categories    : [],
-      category      : {
+      categories     : [],
+      category       : {
         discount            : [],
         discountTierEnabled : false,
         buyXGetYFreeEnabled : false,
+        categoryGroup       : null,
         buyXGetYFree        : {
           x : 0,
           y : 0,
@@ -275,13 +304,36 @@ export default {
           en : 'No antibiotics, no MSG, no preservatives, fresh daily made in Hong Kong.'
         },
       },
-      categoryImg   : ''
+      categoryImg    : ''
     };
   },
 
+  async created () {
+    await this.getCategoryGroups()
+  },
   methods : {
     onImageChange (file) {
       this.categoryImg = URL.createObjectURL(file.raw);
+    },
+
+    async createdCategoryGroup () {
+      const group = await this.$refs.AddCategoryGroupModal.open()
+      if (group) {
+        await this.getCategoryGroups()
+        this.category.categoryGroup = group.id
+      }
+    },
+
+    async getCategoryGroups () {
+      const loading = new Loading.service({ fullscreen : false });
+      try {
+        const categoryGroups = await this.$api.get('/v1/categories/groups')
+        this.categoryGroups = categoryGroups.data
+      } catch (error) {
+        console.log(error)
+      } finally {
+        loading.close()
+      }
     },
 
     async open (categoryId) {
@@ -302,13 +354,14 @@ export default {
     newCategory () {
       this.categoryImg = "//placehold.co/400x400"
       this.category = {
-        discount     : [],
-        buyXGetYFree : [],
-        name         : {
+        discount      : [],
+        buyXGetYFree  : [],
+        categoryGroup : undefined,
+        name          : {
           zh : '',
           en : ''
         },
-        slogan       : {
+        slogan        : {
           zh : '無抗生素，不含味精，不含防腐，每日新鮮香港制造。',
           en : 'No antibiotics, no MSG, no preservatives, fresh daily made in Hong Kong.'
         }
@@ -356,6 +409,7 @@ export default {
 
         // product.category = this.ca
         delete category.id
+        // return console.log(category)
         const result = this.category.id ? await this.$api.patch('/v1/categories/' + this.category.id, category) : await this.$api.post('/v1/categories/', category)
         if (result) {
           this.$notify({
