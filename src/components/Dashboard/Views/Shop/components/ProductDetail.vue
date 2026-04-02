@@ -553,25 +553,6 @@ export default {
           zh : '',
           en : ''
         },
-        nutritionInfo : {
-          servingText  : {
-            zh : '每食用份量100g',
-            en : 'Per serving size 100g'
-          },
-          calories     : null,
-          protein      : null,
-          fat          : {
-            saturatedFat : null,
-            transFat     : null,
-            total        : null
-          },
-          carbohydrate : {
-            fibre  : null,
-            sugars : null,
-            total  : null
-          },
-          sodium       : null
-        },
         edibleMethods : '',
         soldOut       : false,
         publish       : false,
@@ -632,25 +613,6 @@ export default {
           zh : '',
           en : ''
         },
-        nutritionInfo : {
-          servingText  : {
-            zh : '每食用份量100g',
-            en : 'Per serving size 100g'
-          },
-          calories     : null,
-          protein      : null,
-          fat          : {
-            saturatedFat : null,
-            transFat     : null,
-            total        : null
-          },
-          carbohydrate : {
-            fibre  : null,
-            sugars : null,
-            total  : null
-          },
-          sodium       : null
-        },
         edibleMethods : '',
         soldOut       : false,
         publish       : false,
@@ -690,11 +652,6 @@ export default {
         this.product = detail.data
         if (this.product.images.length) {
           this.product.images = detail.data.images.filter(item => item && item.id).map(item => item.id)
-        }
-        if (!this.product.nutritionInfo.servingText) {
-          this.product.nutritionInfo.servingText = {
-            zh : '每食用份量100g', en : 'Per serving size 100g'
-          }
         }
         delete this.product.reviews
         delete this.product.lastEditBy
