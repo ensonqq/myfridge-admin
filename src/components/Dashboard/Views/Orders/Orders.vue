@@ -252,6 +252,12 @@
             </template>
           </el-table-column>
 
+          <el-table-column label="運費" min-width="60">
+            <template #default="scope">
+              ${{ scope.row.deliveryFee }}
+            </template>
+          </el-table-column>
+
           <el-table-column label="收款" prop="paidTotal" min-width="150" sortable>
             <template #default="scope">
               {{ scope.row.orderStatus !== 'confirmed' ? `(${ orderStatusesMapper[scope.row.orderStatus] })` : '' }}{{ scope.row.payment.paymentType }}:<br>
