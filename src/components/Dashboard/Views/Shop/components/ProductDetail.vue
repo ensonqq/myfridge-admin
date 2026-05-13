@@ -12,15 +12,47 @@
               <div class="col-12 col-sm-6">
                 <h5>圖片</h5>
                 <div class="col-sm-12">
-                  <el-upload class="picture w-100 h-100"
-                             drag
-                             ref="image"
-                             action=""
-                             :on-change="onImageChange"
-                             :auto-upload="false"
-                             :show-file-list="false">
-                    <img v-if="productImg" :src="productImg" class="picture-src">
-                  </el-upload>
+                  <div class="multi-image-grid">
+                    <draggable
+                      v-model="imageList"
+                      class="multi-image-grid__draggable"
+                      :options="{ animation: 150, ghostClass: 'image-tile--ghost' }">
+                      <div
+                        v-for="(img, index) in imageList"
+                        :key="img.key"
+                        class="image-tile"
+                        :class="{ 'image-tile--pending': img.isPending }">
+                        <img
+                          :src="img.url"
+                          class="image-tile__img"
+                          :alt="img.isPending ? '待上傳圖片' : '產品圖片'"
+                          @click="openLightbox(img.url)">
+                        <span v-if="img.isPending" class="image-tile__badge">未上傳</span>
+                        <div class="image-tile__drag-handle"><i class="fa fa-arrows"></i></div>
+                        <el-button
+                          size="mini"
+                          type="danger"
+                          class="image-tile__remove"
+                          @click="removeImage(index)">✕</el-button>
+                      </div>
+                    </draggable>
+                    <!-- add new image tile -->
+                    <el-upload
+                      ref="imageUpload"
+                      action=""
+                      drag
+                      :multiple="true"
+                      :auto-upload="false"
+                      :show-file-list="false"
+                      :on-change="onImageAdd"
+                      accept="image/*"
+                      class="image-tile image-tile--add">
+                      <div class="image-tile__add-inner">
+                        <i class="fa fa-plus fa-lg mb-1"></i>
+                        <span>加圖片</span>
+                      </div>
+                    </el-upload>
+                  </div>
                 </div>
               </div>
               <div class="col-12 col-sm-6">
@@ -497,6 +529,13 @@
       </div>
     </div>
     <addItemModal ref="addItemModal"></addItemModal>
+    <!-- Lightbox overlay -->
+    <transition name="lightbox-fade">
+      <div v-if="lightboxUrl" class="lightbox-overlay" @click="closeLightbox">
+        <img :src="lightboxUrl" class="lightbox-img" alt="圖片預覽" @click.stop>
+        <button class="lightbox-close" @click="closeLightbox">✕</button>
+      </div>
+    </transition>
     <!-- Classic Modal -->
     <span slot="footer" class="dialog-footer">
       <el-button @click="close">關閉</el-button>
@@ -543,8 +582,10 @@ export default {
       resolve       : null,
       reject        : null,
       moment,
-      categories    : [],
-      product       : {
+      categories  : [],
+      imageList   : [], // { key, id, url, isPending, file }
+      lightboxUrl : null,
+      product        : {
         ingredients   : {
           zh : '',
           en : ''
@@ -566,8 +607,7 @@ export default {
         },
         isBundled     : false,
         bundleItems   : []
-      },
-      productImg    : ''
+      }
     };
   },
 
@@ -575,8 +615,27 @@ export default {
     deleteAddons (index) {
       this.product.addons.splice(index, 1)
     },
-    onImageChange (file) {
-      this.productImg = URL.createObjectURL(file.raw);
+
+    openLightbox (url) {
+      this.lightboxUrl = url
+    },
+
+    closeLightbox () {
+      this.lightboxUrl = null
+    },
+
+    onImageAdd (file) {
+      this.imageList.push({
+        key       : `pending-${ Date.now() }-${ Math.random() }`,
+        id        : null,
+        url       : URL.createObjectURL(file.raw),
+        isPending : true,
+        file      : file.raw
+      })
+    },
+
+    removeImage (index) {
+      this.imageList.splice(index, 1)
     },
 
     async getCategories () {
@@ -607,7 +666,7 @@ export default {
     },
 
     newProduct () {
-      this.productImg = "//placehold.co/800x800"
+      this.imageList = []
       this.product = {
         ingredients   : {
           zh : '',
@@ -648,11 +707,17 @@ export default {
       const loading = new Loading.service({ fullscreen : false });
       try {
         const detail = await this.$api.get('/v1/products/' + productId)
-        this.productImg = detail.data.images[0] ? detail.data.images[0].large.path : '//placehold.co/800x800'
+        this.imageList = detail.data.images
+          .filter(item => item && item.id)
+          .map(item => ({
+            key       : `existing-${ item.id }`,
+            id        : item.id,
+            url       : (item.large && item.large.path) || (item.original && item.original.path) || '',
+            isPending : false,
+            file      : null
+          }))
         this.product = detail.data
-        if (this.product.images.length) {
-          this.product.images = detail.data.images.filter(item => item && item.id).map(item => item.id)
-        }
+        this.product.images = this.imageList.map(i => i.id)
         delete this.product.reviews
         delete this.product.lastEditBy
         delete this.product.createdAt
@@ -671,7 +736,7 @@ export default {
         const valid = await this.$refs.form.validate()
         if (!valid) return
 
-        await this.uploadAndSetImage()
+        await this.uploadImages()
 
         const product = _.clone(this.product)
 
@@ -711,23 +776,26 @@ export default {
       }
     },
 
-    async uploadAndSetImage () {
-      //process images
-      const file = this.$refs.image.uploadFiles
+    async uploadImages () {
       try {
-        if (file && file.length) {
-          let bodyFormData = new FormData()
-
-          bodyFormData.append('file', file[0].raw)
-
-          let result = await this.$api.post('/v1/uploads/image', bodyFormData)
-          if (result.data) {
-            this.product.images = [result.data.id]
+        const orderedIds = []
+        for (const img of this.imageList) {
+          if (img.isPending) {
+            // upload new file and get its ID
+            const formData = new FormData()
+            formData.append('file', img.file)
+            const result = await this.$api.post('/v1/uploads/image', formData)
+            if (result.data && result.data.id) {
+              orderedIds.push(result.data.id)
+            }
+          } else {
+            // existing image, keep in current position
+            orderedIds.push(img.id)
           }
         }
+        this.product.images = orderedIds
       } catch (e) {
         console.log(e)
-      } finally {
       }
       return true
     },
@@ -739,8 +807,9 @@ export default {
     },
     reset () {
       this.categories = []
+      this.imageList = []
+      if (this.$refs.imageUpload) this.$refs.imageUpload.clearFiles()
       this.newProduct()
-      this.productImg = ''
     }
   }
 }
@@ -748,11 +817,6 @@ export default {
 <style lang="scss">
 .no-edit {
   background-color: #eee !important;
-}
-
-.el-upload-dragger {
-  width: inherit;
-  height: inherit;
 }
 
 .removeBundleItem {
@@ -763,7 +827,196 @@ export default {
   }
 }
 
-.image-container {
+/* Lightbox overlay */
+.lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+}
+
+.lightbox-img {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 4px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
+  cursor: default;
+}
+
+.lightbox-close {
+  position: fixed;
+  top: 20px;
+  right: 28px;
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  color: #fff;
+  font-size: 24px;
+  line-height: 1;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
+}
+
+.lightbox-fade-enter-active,
+.lightbox-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.lightbox-fade-enter,
+.lightbox-fade-leave-to {
+  opacity: 0;
+}
+
+/* image tile cursor */
+.image-tile__img {
+  cursor: zoom-in;
+}
+
+.image-tile {
+  // ...existing code...
+
+  &__drag-handle {
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    color: rgba(255, 255, 255, 0.85);
+    background: rgba(0, 0, 0, 0.35);
+    border-radius: 3px;
+    padding: 2px 5px;
+    font-size: 12px;
+    cursor: grab;
+    line-height: 1.4;
+
+    &:active {
+      cursor: grabbing;
+    }
+  }
+
+  &--ghost {
+    opacity: 0.4;
+    border: 2px dashed #409eff;
+  }
+}
+.multi-image-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+/* make draggable wrapper transparent so tiles flow directly in the flex grid */
+.multi-image-grid__draggable {
+  display: contents;
+}
+
+.image-tile {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid #ddd;
+  background: #f5f5f5;
+
+  &__img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  &__remove {
+    position: absolute !important;
+    top: 4px;
+    right: 4px;
+    padding: 2px 6px !important;
+    font-size: 11px !important;
+    line-height: 1.2 !important;
+    opacity: 0.85;
+
+    &:hover {
+      opacity: 1;
+    }
+  }
+
+  &__badge {
+    position: absolute;
+    bottom: 4px;
+    left: 4px;
+    background: #e6a23c;
+    color: #fff;
+    font-size: 10px;
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+
+  &--pending {
+    border: 1px dashed #e6a23c;
+  }
+
+  &--add {
+    border: 2px dashed #c0c4cc;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: visible;
+
+    &:hover {
+      border-color: #409eff;
+      color: #409eff;
+    }
+
+    /* make the el-upload wrapper and dragger fill the tile */
+    .el-upload,
+    .el-upload-dragger {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      background: transparent;
+      border-radius: 0;
+    }
+
+    .el-upload-dragger:hover {
+      border: none;
+    }
+
+    .el-upload-dragger.is-dragover {
+      border: none;
+      background: rgba(64, 158, 255, 0.08);
+    }
+  }
+
+  &__add-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    color: #909399;
+    font-size: 12px;
+
+    &:hover {
+      color: #409eff;
+    }
+  }
 }
 </style>
