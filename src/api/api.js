@@ -6,8 +6,8 @@ const hostname = window.location.hostname
 // const localApiRoot = 'http://api.myfridgehk.com'
 const localApiRoot = 'http://localhost:3001'
 // const localApiRoot = 'http://dev.myfridgehk.com/api'
-const devApiRoot = 'http://api-dev.myfridgehk.com'
-const prodApiRoot = 'http://api.myfridgehk.com'
+const devApiRoot = 'https://api.myfridgehk.com'
+const prodApiRoot = 'https://api.myfridgehk.com'
 
 const baseURL = hostname === 'm9sj7sd1.myfridgehk.com' ? prodApiRoot : hostname === 'admin-dev.myfridgehk.com' ? devApiRoot : localApiRoot
 
