@@ -319,27 +319,29 @@
         </stats-card>
       </div>
 
-      <div class="col-lg-3 col-md-6 col-sm-6">
-        <stats-card type="danger"
-                    icon='fa fa-dashboard'
-                    small-title="總Sku數量"
-                    :title="dashboard.skuQuantities? dashboard.skuQuantities.total: 0">
-          <table slot="sub-content" class="pull-right" v-if="dashboard.skuQuantities">
-            <tr v-for="(qty, category) in dashboard.skuQuantities.categories">
-              <td>{{ category }}:</td>
-              <td>{{ qty }}</td>
-            </tr>
-            <tr>
-              <td>每月平均:</td>
-              <td>{{ dashboard.skuQuantities ? dashboard.skuQuantities.monthAvg : 0 }}</td>
-            </tr>
-          </table>
-          <div class="stats" slot="footer">
-            <i class="fa fa-globe"></i>
-            開業至今
-          </div>
-        </stats-card>
-      </div>
+      <!--
+            <div class="col-lg-3 col-md-6 col-sm-6">
+              <stats-card type="danger"
+                          icon='fa fa-dashboard'
+                          small-title="總Sku數量"
+                          :title="dashboard.skuQuantities? dashboard.skuQuantities.total: 0">
+                <table slot="sub-content" class="pull-right" v-if="dashboard.skuQuantities">
+                  <tr v-for="(qty, category) in dashboard.skuQuantities.categories">
+                    <td>{{ category }}:</td>
+                    <td>{{ qty }}</td>
+                  </tr>
+                  <tr>
+                    <td>每月平均:</td>
+                    <td>{{ dashboard.skuQuantities ? dashboard.skuQuantities.monthAvg : 0 }}</td>
+                  </tr>
+                </table>
+                <div class="stats" slot="footer">
+                  <i class="fa fa-globe"></i>
+                  開業至今
+                </div>
+              </stats-card>
+            </div>
+      -->
     </div>
 
 

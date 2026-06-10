@@ -22,11 +22,11 @@ export default [
       }
     ],
   },
-  {
-    name : '每月排行',
-    icon : 'fa fa-gittip',
-    path : '/monthlyRank',
-  },
+  // {
+  //   name : '每月排行',
+  //   icon : 'fa fa-gittip',
+  //   path : '/monthlyRank',
+  // },
   {
     name     : '用戶',
     icon     : 'nc-icon nc-circle-10',
