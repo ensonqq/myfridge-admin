@@ -189,9 +189,29 @@ export default async function (orders, _sort, categories, $api) {
       // doc.autoPrint({ variant : 'non-conform' });
       const orderPDF = new Blob([doc.output('blob')], { type : 'application/pdf' })
       await merger.add(orderPDF)
-      // get SFWaybillPDF
-      const wayBill = await $api.post('/v1/orders/sf/wayBillProxy', order.delivery.wayBillDoc, { responseType : 'blob' })
-      await merger.add(wayBill.data)
+
+      // Factory self-pickup (pickupLocationCode '0000'): skip SF waybill, print 工場自取單 page instead
+      if (order.deliveryType === 'pickup' && order.pickupLocationCode === '0000') {
+        const factoryDoc = new jsPDF('', 'mm', 'a6');
+        factoryDoc.deletePage(1);
+        factoryDoc.setFont('optmeal');
+        factoryDoc.addPage();
+        factoryDoc.setFontSize(36);
+        factoryDoc.text('工場自取單', 52.5, 65, { align: 'center' });
+        factoryDoc.setFontSize(14);
+        factoryDoc.text(order.orderNumber, 52.5, 82, { align: 'center' });
+        if (order.deliveryDay) {
+          const _dd = new Date(order.deliveryDay)
+          factoryDoc.text((_dd.getMonth() + 1) + '月' + _dd.getDate() + '日', 52.5, 93, { align: 'center' });
+        }
+        const factoryPDF = new Blob([factoryDoc.output('blob')], { type : 'application/pdf' })
+        await merger.add(factoryPDF)
+      } else if (order.delivery && order.delivery.wayBillDoc) {
+        // All other orders (incl. non-0000 pickup locations): fetch SF waybill as normal
+        const wayBill = await $api.post('/v1/orders/sf/wayBillProxy', order.delivery.wayBillDoc, { responseType : 'blob' })
+        await merger.add(wayBill.data)
+      }
+
       const currentIndex = parseInt(orderIndex) + 1
       element.innerHTML = `${ initSpinnerText }<b class="text-danger">(${ currentIndex }/${ orders.length })</b>`
     }

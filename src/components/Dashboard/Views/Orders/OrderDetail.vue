@@ -726,6 +726,11 @@ export default {
           live    : 'https://dashboard.stripe.com/payments/',
         },
 
+        cc : {
+          sandbox : '',
+          live    : '',
+        },
+
         octopus   : {
           sandbox : '',
           live    : '',

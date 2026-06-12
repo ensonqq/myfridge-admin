@@ -557,9 +557,25 @@ export default {
       });
       try {
         const selectedOrders = type === 'allUnprinted' ? this.result.results.filter(item => !item.printed) : this.multipleSelection
-        const bulkPrint = await this.$api.post('/v1/orders/sf/createWayBillBulk', selectedOrders.map(item => item.orderNumber))
-        if (bulkPrint.data && bulkPrint.data.length) {
-          const PDFurl = await printOrders_SF(bulkPrint.data, this.$api)
+
+        // Separate pickup orders (no SF waybill needed) from home-delivery orders
+        const deliveryOrders = selectedOrders.filter(item => !(item.deliveryType === 'pickup' && item.pickupLocationCode === '0000'))
+        const pickupOrders   = selectedOrders.filter(item => item.deliveryType === 'pickup' && item.pickupLocationCode === '0000')
+
+        // Only factory self-pickup (pickupLocationCode '0000') skips SF waybill creation
+        let deliveryOrdersWithWayBill = []
+        if (deliveryOrders.length) {
+          const bulkPrint = await this.$api.post('/v1/orders/sf/createWayBillBulk', deliveryOrders.map(item => item.orderNumber))
+          if (bulkPrint.data && bulkPrint.data.length) {
+            deliveryOrdersWithWayBill = bulkPrint.data
+          }
+        }
+
+        // Combine delivery orders (with waybill data) + pickup orders (no waybill)
+        const allOrdersForPrint = [...deliveryOrdersWithWayBill, ...pickupOrders]
+
+        if (allOrdersForPrint.length) {
+          const PDFurl = await printOrders_SF(allOrdersForPrint, this.$api)
           window.open(PDFurl)
 
           const ids = selectedOrders.map(item => item.id)
@@ -567,7 +583,9 @@ export default {
           this.result.results.forEach(item => {
             if (ids.includes(item.id)) {
               item.printed = true
-              item.delivery.billNo = 'tbc'
+              if (!(item.deliveryType === 'pickup' && item.pickupLocationCode === '0000')) {
+                item.delivery.billNo = 'tbc'
+              }
             }
           })
         }
