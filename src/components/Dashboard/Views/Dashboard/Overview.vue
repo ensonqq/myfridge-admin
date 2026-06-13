@@ -511,7 +511,7 @@ export default {
   },
   async created () {
     if (this.user.role !== 'super') {
-      this.$router.push('/orders/byDeliveryDayV2')
+      this.$router.push('/shop/products')
     } else {
       await this.getCategoriesWithProducts()
       this.getDashboard()

@@ -30,10 +30,12 @@ export default [
   {
     name     : '用戶',
     icon     : 'nc-icon nc-circle-10',
+    roleRequired : 'super',
     children : [
       {
         name : '管理員',
-        path : '/users/admin'
+        path : '/users/admin',
+        roleRequired : 'super'
       },
       /*{
         name : 'KOL',
@@ -41,7 +43,8 @@ export default [
       },*/
       {
         name : '會員',
-        path : '/users/member'
+        path : '/users/member',
+        roleRequired : 'super'
       },
       /*{
         name : '學生',
@@ -52,14 +55,17 @@ export default [
   {
     name     : '訂單',
     icon     : 'fa fa-list-alt',
+    roleRequired : 'super',
     children : [
       {
         name : '落單日',
-        path : '/orders/byCheckoutDay'
+        path : '/orders/byCheckoutDay',
+        roleRequired : 'super',
       },
       {
         name : '送貨日',
-        path : '/orders/byDeliveryDayV2'
+        path : '/orders/byDeliveryDayV2',
+        roleRequired : 'super'
       },
       // {
       //   name : '送貨日(舊)',
@@ -102,14 +108,17 @@ export default [
   {
     name     : '積分',
     icon     : 'nc-icon nc-credit-card',
+    roleRequired : 'super',
     children : [
       {
         name : '增值紀錄',
-        path : '/topup/topupOrders'
+        path : '/topup/topupOrders',
+        roleRequired : 'super',
       },
       {
         name : '積分卡',
-        path : '/topup/topups'
+        path : '/topup/topups',
+        roleRequired : 'super'
       },
       // {
       //   name : '積分領取',
@@ -121,18 +130,22 @@ export default [
     name : '優惠碼',
     icon : 'fa fa-bolt',
     path : '/vouchers',
+    roleRequired : 'super'
   },
   {
     name     : '抽獎',
     icon     : 'fa fa-money',
+    roleRequired : 'super',
     children : [
       {
         name : '抽獎活動',
-        path : '/prizes/all'
+        path : '/prizes/all',
+        roleRequired : 'super'
       },
       {
         name : '抽獎紀錄',
-        path : '/prizes/records'
+        path : '/prizes/records',
+        roleRequired : 'super'
       },
     ]
 
@@ -147,11 +160,13 @@ export default [
     name : '優惠Banner',
     icon : 'fa fa-glass',
     path : '/promotions',
+    roleRequired : 'super'
   },
   {
     name : '零售點',
     icon : 'fa fa-sitemap',
     path : '/retails',
+    roleRequired : 'super'
   },
   // {
   //   name     : '帳單',
@@ -167,7 +182,8 @@ export default [
   {
     name : '設定',
     icon : 'fa fa-cog',
-    path : '/settings'
+    path : '/settings',
+    roleRequired : 'super'
   },
   /*{
    name     : 'Pages',
