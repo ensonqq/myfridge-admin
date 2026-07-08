@@ -100,7 +100,7 @@ export default {
     async getProducts () {
       const loading = Loading.service({ fullscreen : false });
       try {
-        const result = await this.$api.get('/v1/products')
+        const result = await this.$api.get('/v1/products?limit=1000')
         this.products = result.data.results
       } catch (error) {
         console.log(error)
