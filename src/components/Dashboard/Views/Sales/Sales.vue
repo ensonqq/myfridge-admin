@@ -78,7 +78,10 @@
           <el-table-column label="訂單量" sortable prop="orders" min-width="100"></el-table-column>
           <el-table-column label="產品數量" sortable prop="quantity" min-width="135"></el-table-column>
 
-          <el-table-column v-for="(name,id) in categories" :key="name" :label="name" :prop="name"></el-table-column>
+          <el-table-column v-for="column in categoryColumns"
+                           :key="column.fieldKey"
+                           :label="column.label"
+                           :prop="column.fieldKey"></el-table-column>
           <el-table-column label="送貨/自取" min-width="130">
             <template #default="scope">
               {{ scope.row.deliveryTypeCtn.delivery }}/{{ scope.row.deliveryTypeCtn.pickup }}
@@ -89,7 +92,9 @@
           </el-table-column>
           <el-table-column label="訂單明細" sortable prop="orders" min-width="200">
             <template #default="scope">
-              <div>會員: {{ scope.row.memberOrders }}, 非會員: {{ scope.row.nonMemberOrders }}, 未完成: {{ scope.row.incompleteOrders }}, 取消: {{ scope.row.cancelledOrders }}</div>
+              <div>會員: {{ scope.row.memberOrders }}, 非會員: {{ scope.row.nonMemberOrders }}, 未完成:
+                {{ scope.row.incompleteOrders }}, 取消: {{ scope.row.cancelledOrders }}
+              </div>
             </template>
           </el-table-column>
           <!--          <el-table-column label="產品售價" min-width="200">
@@ -99,7 +104,8 @@
       </div>
       <div class="col-12 mt-3 row">
         <div class="col-sm-6 pagination-info">
-          <p class="category">{{ (result.page - 1) * result.limit + 1 }} 至 {{ result.page * result.limit }} (共{{ result.totalResults }}個結果)</p>
+          <p class="category">{{ (result.page - 1) * result.limit + 1 }} 至 {{ result.page * result.limit }}
+            (共{{ result.totalResults }}個結果)</p>
         </div>
         <div class="col-sm-6">
           <p-pagination class="pull-right"
@@ -112,7 +118,7 @@
     </div>
     <div class="card-body row" v-else>
       <div class="col-12">
-        <h3>沒有權限，你老母臭閪係咪行撚錯路</h3>
+        <h3>沒有權限，你係咪行錯路</h3>
       </div>
     </div>
     <ConfirmDialog ref="ConfirmDialog"></ConfirmDialog>
@@ -121,54 +127,58 @@
 
 <script>
 import {Button, Select, Option, Switch, Loading, Table, TableColumn} from 'element-ui'
-import Vue                                                           from 'vue'
-import PSwitch                                                       from 'src/components/UIComponents/Switch.vue'
-import PPagination                                                   from 'src/components/UIComponents/Pagination.vue'
-import moment                                                        from 'moment'
-import _                                                             from 'lodash'
-import ConfirmDialog                                                 from '../Components/ConfirmDialog'
-import {mapState}                                                    from "vuex";
+import Vue from 'vue'
+import PSwitch from 'src/components/UIComponents/Switch.vue'
+import PPagination from 'src/components/UIComponents/Pagination.vue'
+import moment from 'moment'
+import _ from 'lodash'
+import ConfirmDialog from '../Components/ConfirmDialog'
+import {mapState} from "vuex";
 
 Vue.use(Table)
 Vue.use(TableColumn)
 export default {
-  name       : "Categories",
-  components : {
-    [Select.name] : Select,
-    [Option.name] : Option,
-    [Button.name] : Button,
-    [Switch.name] : Switch,
-    [Table.name]  : Table,
+  name: "Categories",
+  components: {
+    [Select.name]: Select,
+    [Option.name]: Option,
+    [Button.name]: Button,
+    [Switch.name]: Switch,
+    [Table.name]: Table,
     PSwitch,
     PPagination,
     ConfirmDialog
   },
-  computed   : {
+  computed: {
     ...mapState(['user'])
   },
-  watch      : {
-    filters : {
-      deep    : true,
-      handler : function () {
+  watch: {
+    filters: {
+      deep: true,
+      handler: function () {
         this.getSales()
       }
     },
-    sort    : {
-      deep    : true,
-      handler : function () {
+    sort: {
+      deep: true,
+      handler: function () {
         this.getSales()
       }
     },
-    page    : 1,
+    page: 1,
   },
 
-  async created () {
+  async created() {
     await this.getCategories()
     await this.getSales()
   },
 
-  methods : {
-    getAvgCatPrice (cat) {
+  methods: {
+    getCategoryFieldKey(categoryId) {
+      return `cat_${String(categoryId || '').replace(/[^a-zA-Z0-9_-]/g, '_')}`
+    },
+
+    getAvgCatPrice(cat) {
       let avgPrice = 0
       let quantity = 0
       cat.forEach(item => {
@@ -181,64 +191,80 @@ export default {
       return (avgPrice / quantity).toFixed(2)
     },
 
-    sortByCat (skuSellingPrice) {
+    sortByCat(skuSellingPrice) {
       const grouped = _.mapValues(_.groupBy(skuSellingPrice, 'product.category.name.zh'), clist => clist.map(item => _.omit(item, 'product.category.name.zh')));
       return grouped
     },
-    sortChange ({ prop, order }) {
-      this.sort = { prop, order : order }
+    sortChange({prop, order}) {
+      this.sort = {prop, order: order}
     },
 
-    getSales () {
+    getSales() {
       this.loading = true
       this.result.results = []
       this.debounceData()
     },
 
-    toDollar (value) {
+    toDollar(value) {
       let formatting_options = {
-        style                 : 'currency',
-        currency              : 'HKD',
-        minimumFractionDigits : 0,
+        style: 'currency',
+        currency: 'HKD',
+        minimumFractionDigits: 0,
       }
       const dollarString = new Intl.NumberFormat('zh-HK', formatting_options);
       return dollarString.format(value)
     },
 
-    async getCategories () {
+    async getCategories() {
       try {
         const t = this
         const categories = await t.$api.get('/v1/categories')
         if (categories && categories.data) {
-          const cats = {}
-          categories.data.results.forEach(item => {
-            cats[item.id] = item.name.zh
+          const categoryColumns = []
+          const categoryFieldById = {}
+          categories.data.results.forEach((item, index) => {
+            const categoryId = item.id || item._id || `unknown_${index}`
+            const label = _.get(item, 'name.zh', '').trim() || `未命名分類 ${index + 1}`
+            const fieldKey = this.getCategoryFieldKey(categoryId)
+
+            categoryColumns.push({
+              id: categoryId,
+              label,
+              fieldKey
+            })
+            categoryFieldById[String(categoryId)] = fieldKey
           })
-          this.categories = cats
+
+          this.categoryColumns = categoryColumns
+          this.categoryFieldById = categoryFieldById
         }
       } catch (e) {
         console.log(e)
       }
     },
 
-    debounceData : _.debounce(async function () {
+    debounceData: _.debounce(async function () {
       const t = this
       try {
         const params = _.omitBy(t.filters, val => !val)
         if (this.sort.order) {
           params.sortBy = this.sort.prop + (this.sort.order === 'descending' ? ':desc' : '')
         }
-        const sales = await t.$api.get('/v1/sales', { params })
+        const sales = await t.$api.get('/v1/sales', {params})
         if (sales && sales.data) {
           sales.data.results = sales.data.results.map(item => {
             const cat = {}
             item.catSummary.forEach(catStat => {
-              cat[catStat.category.name.zh] = catStat.quantity
+              const categoryId = _.get(catStat, 'category.id') || _.get(catStat, 'category._id')
+              const fieldKey = categoryId ? this.categoryFieldById[String(categoryId)] : ''
+
+              if (fieldKey) {
+                cat[fieldKey] = catStat.quantity
+              }
             })
-            return { ...item, ...cat }
+            return {...item, ...cat}
           })
           t.result = sales.data
-
         }
       } catch (e) {
         console.log(e)
@@ -247,37 +273,38 @@ export default {
       }
     }, 1000)
   },
-  data () {
+  data() {
     return {
-      reportTypeSelect : [{ label : '每日', value : 'daily' }, { label : '每星期', value : 'weekly' },
-        { label : '每月', value : 'monthly' }, { label : '每年', value : 'yearly' }],
-      loading          : false,
-      sort             : { prop : 'date', order : 'descending' },
-      filters          : {
-        reportType : 'daily',
-        status     : '',
-        limit      : 100,
-        page       : 1,
+      reportTypeSelect: [{label: '每日', value: 'daily'}, {label: '每星期', value: 'weekly'},
+        {label: '每月', value: 'monthly'}, {label: '每年', value: 'yearly'}],
+      loading: false,
+      sort: {prop: 'date', order: 'descending'},
+      filters: {
+        reportType: 'daily',
+        status: '',
+        limit: 100,
+        page: 1,
       },
-      weekdays         : {
-        Mon : '一',
-        Tue : '二',
-        Wed : '三',
-        Thu : '四',
-        Fri : '五',
-        Sat : '六',
-        Sun : '日',
+      weekdays: {
+        Mon: '一',
+        Tue: '二',
+        Wed: '三',
+        Thu: '四',
+        Fri: '五',
+        Sat: '六',
+        Sun: '日',
       },
-      categories       : [],
-      result           : {
-        limit        : 0,
-        page         : 0,
-        total        : 0,
-        totalResults : 0,
-        totalPages   : 0,
-        results      : []
+      categoryColumns: [],
+      categoryFieldById: {},
+      result: {
+        limit: 0,
+        page: 0,
+        total: 0,
+        totalResults: 0,
+        totalPages: 0,
+        results: []
       },
-      header           : [],
+      header: [],
       moment
     }
   }
