@@ -8,7 +8,7 @@
     <div class="card-body row" v-if="user.role === 'super'">
       <div class="col-12 row">
         <div class="col-8 row">
-          <div class="col-12 col-lg-5">
+          <div class="col-12 col-lg-4">
             <fg-input label="選擇報表類別">
               <el-select size="small"
                          class="select-normal"
@@ -20,6 +20,25 @@
                 </el-option>
               </el-select>
             </fg-input>
+          </div>
+          <div class="col-12 col-lg-4">
+            <fg-input label="匯出月份">
+              <el-date-picker size="small"
+                              v-model="exportMonth"
+                              type="month"
+                              value-format="yyyy-MM"
+                              :clearable="false"
+                              placeholder="選擇月份">
+              </el-date-picker>
+            </fg-input>
+          </div>
+          <div class="col-12 col-lg-2 d-flex align-items-center" style="padding-top: 10px;">
+            <el-button size="small"
+                       type="success"
+                       :loading="exporting"
+                       @click="exportExcel">
+              <i class="fa fa-file-excel-o"></i> 匯出Excel
+            </el-button>
           </div>
         </div>
       </div>
@@ -126,7 +145,7 @@
 </template>
 
 <script>
-import {Button, Select, Option, Switch, Loading, Table, TableColumn} from 'element-ui'
+import {Button, Select, Option, Switch, Loading, Table, TableColumn, DatePicker} from 'element-ui'
 import Vue from 'vue'
 import PSwitch from 'src/components/UIComponents/Switch.vue'
 import PPagination from 'src/components/UIComponents/Pagination.vue'
@@ -145,6 +164,7 @@ export default {
     [Button.name]: Button,
     [Switch.name]: Switch,
     [Table.name]: Table,
+    [DatePicker.name]: DatePicker,
     PSwitch,
     PPagination,
     ConfirmDialog
@@ -243,6 +263,111 @@ export default {
       }
     },
 
+    mapSalesRow(item) {
+      const cat = {}
+      item.catSummary.forEach(catStat => {
+        const categoryId = _.get(catStat, 'category.id') || _.get(catStat, 'category._id')
+        const fieldKey = categoryId ? this.categoryFieldById[String(categoryId)] : ''
+
+        if (fieldKey) {
+          cat[fieldKey] = catStat.quantity
+        }
+      })
+      return {...item, ...cat}
+    },
+
+    async exportExcel() {
+      if (!this.exportMonth) return
+      const t = this
+      t.exporting = true
+      try {
+        if (!t.categoryColumns.length) {
+          await t.getCategories()
+        }
+
+        const rows = []
+        let page = 1
+        let keepGoing = true
+        while (keepGoing) {
+          const sales = await t.$api.get('/v1/sales', {
+            params: {reportType: 'daily', limit: 100, page, sortBy: 'date:desc'}
+          })
+          const results = _.get(sales, 'data.results') || []
+          if (!results.length) break
+
+          results.forEach(item => {
+            const rowMonth = moment(item.date).format('YYYY-MM')
+            if (rowMonth === t.exportMonth) {
+              rows.push(t.mapSalesRow(item))
+            } else if (rowMonth < t.exportMonth) {
+              keepGoing = false
+            }
+          })
+
+          if (page >= _.get(sales, 'data.totalPages', page)) keepGoing = false
+          page++
+        }
+
+        if (!rows.length) {
+          t.$notify({title: '沒有數據', message: `${t.exportMonth} 月份沒有銷售數據`, type: 'warning'})
+          return
+        }
+
+        rows.sort((a, b) => a.date < b.date ? -1 : 1)
+
+        const aoa = [[
+          '日期', '營業額', '訂單量', '產品數量',
+          ...t.categoryColumns.map(col => col.label),
+          '送貨', '自取', '平均每單', '會員訂單', '非會員訂單', '未完成訂單', '取消訂單'
+        ]]
+        rows.forEach(row => {
+          aoa.push([
+            `${row.date} (${t.weekdays[moment(row.date).format('dddd').substring(0, 3)]})`,
+            row.turnover,
+            row.orders,
+            row.quantity,
+            ...t.categoryColumns.map(col => row[col.fieldKey] || 0),
+            _.get(row, 'deliveryTypeCtn.delivery', 0),
+            _.get(row, 'deliveryTypeCtn.pickup', 0),
+            row.orders ? Number((row.turnover / row.orders).toFixed(1)) : 0,
+            row.memberOrders,
+            row.nonMemberOrders,
+            row.incompleteOrders,
+            row.cancelledOrders,
+          ])
+        })
+
+        const productAoa = [['日期', '類別', '產品', '售價', '數量']]
+        rows.forEach(row => {
+          const dateLabel = `${row.date} (${t.weekdays[moment(row.date).format('dddd').substring(0, 3)]})`
+          const items = _.sortBy(row.skuSellingPrice || [], [
+            item => _.get(item, 'product.category.name.zh', ''),
+            item => _.get(item, 'product.name.zh', '')
+          ])
+          items.forEach(item => {
+            productAoa.push([
+              dateLabel,
+              _.get(item, 'product.category.name.zh', ''),
+              _.get(item, 'product.name.zh', ''),
+              item.price || '',
+              item.quantity || 0,
+            ])
+          })
+        })
+
+        const wb = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), '業積表')
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(productAoa), '產品統計')
+        XLSX.writeFile(wb, `業積表_${t.exportMonth}.xlsx`)
+        t.$notify({title: '成功', message: '匯出成功', type: 'success'})
+      } catch (e) {
+        console.log(e)
+        t.$notify({title: '錯誤', message: '匯出失敗', type: 'error'})
+      } finally {
+        t.exporting = false
+      }
+    },
+
     debounceData: _.debounce(async function () {
       const t = this
       try {
@@ -252,18 +377,7 @@ export default {
         }
         const sales = await t.$api.get('/v1/sales', {params})
         if (sales && sales.data) {
-          sales.data.results = sales.data.results.map(item => {
-            const cat = {}
-            item.catSummary.forEach(catStat => {
-              const categoryId = _.get(catStat, 'category.id') || _.get(catStat, 'category._id')
-              const fieldKey = categoryId ? this.categoryFieldById[String(categoryId)] : ''
-
-              if (fieldKey) {
-                cat[fieldKey] = catStat.quantity
-              }
-            })
-            return {...item, ...cat}
-          })
+          sales.data.results = sales.data.results.map(item => this.mapSalesRow(item))
           t.result = sales.data
         }
       } catch (e) {
@@ -278,6 +392,8 @@ export default {
       reportTypeSelect: [{label: '每日', value: 'daily'}, {label: '每星期', value: 'weekly'},
         {label: '每月', value: 'monthly'}, {label: '每年', value: 'yearly'}],
       loading: false,
+      exporting: false,
+      exportMonth: moment().format('YYYY-MM'),
       sort: {prop: 'date', order: 'descending'},
       filters: {
         reportType: 'daily',
